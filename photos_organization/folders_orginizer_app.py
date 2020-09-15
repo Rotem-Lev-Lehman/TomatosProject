@@ -7,6 +7,9 @@ from PIL import Image, ImageTk
 
 class MyWindow:
     def __init__(self, win):
+        self.pixels_x = 1280
+        self.pixels_y = 720
+
         self.lbl_photos_folder=Label(win, text='Photos folder')
         self.lbl_dest_folder=Label(win, text='Destination folder')
         self.t_photos=Entry()
@@ -14,15 +17,17 @@ class MyWindow:
         self.btn_start = Button(win, text='Start organizing photos', command=self.start_organizing)
         self.btn_keep=Button(win, text='Keep in the same folder', command=self.keep)
         self.btn_new_row=Button(win, text='Put in a new tomatoes row', command=self.new_row)
-        self.btn_new_sign=Button(win, text='Put in the same tomatoes row but in a new sign folder', command=self.new_sign)
-        self.lbl_photos_folder.place(x=100, y=50)
-        self.t_photos.place(x=200, y=50)
-        self.lbl_dest_folder.place(x=100, y=100)
-        self.t_dest.place(x=200, y=100)
-        self.btn_start.place(x=400, y=50)
-        self.btn_keep.place(x=100, y=150)
-        self.btn_new_row.place(x=100, y=250)
-        self.btn_new_sign.place(x=100, y=200)
+        self.btn_new_sign=Button(win, text='Put in a new sign folder', command=self.new_sign)
+        self.btn_skip=Button(win, text='Skip', command=self.skip)
+        self.lbl_photos_folder.place(x=self.pixels_x + 25, y=100)
+        self.t_photos.place(x=self.pixels_x + 125, y=100)
+        self.lbl_dest_folder.place(x=self.pixels_x + 25, y=150)
+        self.t_dest.place(x=self.pixels_x + 125, y=150)
+        self.btn_start.place(x=self.pixels_x + 25, y=50)
+        self.btn_keep.place(x=self.pixels_x + 25, y=200)
+        self.btn_new_row.place(x=self.pixels_x + 25, y=300)
+        self.btn_new_sign.place(x=self.pixels_x + 25, y=250)
+        self.btn_skip.place(x=self.pixels_x + 25, y=350)
         # self.lbl3.place(x=100, y=200)
         # self.t3.place(x=200, y=200)
         self.tomatoes_row_index = 0
@@ -32,14 +37,12 @@ class MyWindow:
         self.photos_generator = None
         self.current_folder = None
         self.current_path = None
-        self.pixels_x = 300
-        self.pixels_y = 300
 
         photo = r'..\app_images\tomatoes_image.jpg'
         self.photo = ImageTk.PhotoImage(Image.open(photo).resize((self.pixels_x, self.pixels_y)))
 
         self.vlabel = Label(win, image=self.photo)
-        self.vlabel.place(x=100, y=300)
+        self.vlabel.place(x=10, y=10)
 
     def start_organizing(self):
         self.tomatoes_row_index = 0
@@ -60,6 +63,10 @@ class MyWindow:
 
     def keep(self):
         self.save_photo_in_new_dest()
+        self.continue_execution()
+
+    def skip(self):
+        print("Skipping this photo")
         self.continue_execution()
 
     def new_row(self):
@@ -103,5 +110,7 @@ class MyWindow:
 window = Tk()
 mywin = MyWindow(window)
 window.title('Organize folders')
-window.geometry("600x700+10+10")
+pad = 3
+window.geometry("{0}x{1}+0+0".format(
+            window.winfo_screenwidth()-pad, window.winfo_screenheight()-pad))
 window.mainloop()

@@ -99,7 +99,10 @@ for path, subdirs, files in os.walk(root):
         if not os.path.exists(save_image_path):
             os.makedirs(save_image_path)
         if len(os.listdir(save_image_path)) == 0:
-            read_bag(name, join(path, name), save_image_path, frame_number)
+            try:
+                read_bag(name, join(path, name), save_image_path, frame_number)
+            except:
+                print('The bag file: ' + name + ' is corrupted, so ignoring it.')
         else:
             print("skipping this bag because it was already handled")
         index += 1
