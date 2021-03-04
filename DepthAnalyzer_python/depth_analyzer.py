@@ -5,7 +5,7 @@ from pathlib import Path
 import gdal
 from tqdm import tqdm
 
-main_path = r"C:\Users\User\Desktop\second_degree\tomatos_project\Progress\Data_depth_no_rec\Week3\Camera1\Rows2_5"
+main_path = r"C:\Users\User\Desktop\second_degree\tomatos_project\Progress\Data\Week3\Camera2\All_rows"
 
 original_images_path = fr"{main_path}\Raw_data\Rows"
 cut_images_path = fr"{main_path}\JPEGS"
@@ -26,6 +26,9 @@ def find_and_save_cuts(original_image_path, cut_image_path, depth_image_path, pr
         cut_img = cv2.rotate(cut_img, cv2.ROTATE_180)
         result = cv2.matchTemplate(regular_img, cut_img, cv2.TM_CCOEFF_NORMED)
         if result.max() < confidence:
+            cv2.imshow('regular image', regular_img)
+            cv2.imshow('cut image', cut_img)
+            cv2.waitKey(0)
             raise Exception('Tried to flip but still could not find a match!')
         rev = True
 
