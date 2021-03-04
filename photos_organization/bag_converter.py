@@ -85,7 +85,7 @@ def read_bag(file_name,bag_path,save_path,frame_number,flag=False):
             print (ex)
 
 
-main_folder = r"C:\Users\User\Desktop\second_degree\tomatos_project\data\week2"
+main_folder = r"C:\Users\User\Desktop\second_degree\tomatos_project\data\from other computer\week2"
 root = main_folder + r"\bags"  # bags files folder
 save_path = main_folder + r"\images"  # path for saving images
 frame_number = 0  # number of frame which will be saved
