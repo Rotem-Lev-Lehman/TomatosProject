@@ -29,7 +29,7 @@ def post_processing(flag):
         fill_hole_filter.set_option(rs.option.holes_fill, 1)
 
 
-def read_bag(file_name,bag_path,save_path,frame_number,flag=False):
+def read_bag(file_name,bag_path,save_path,frame_number,flag=False, contains_depth=True):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     global dis_filter
@@ -62,22 +62,26 @@ def read_bag(file_name,bag_path,save_path,frame_number,flag=False):
             if (i==frame_number): # saving only the third frame
                 frames  =  pipeline.wait_for_frames()
                 aligned_frames = align.process(frames)
-                depth = aligned_frames.get_depth_frame()
+                if contains_depth:
+                    depth = aligned_frames.get_depth_frame()
                 color = aligned_frames.get_color_frame()
                 #depth = dis_filter.process(depth)
                 #depth = spat_filter.process(depth)
                 #depth = temp_filter.process(depth)
-                if flag==True:
-                    depth = fill_hole_filter.process(depth)
-                depth_image = np.asanyarray(depth.get_data())
+                if contains_depth:
+                    if flag==True:
+                        depth = fill_hole_filter.process(depth)
+                    depth_image = np.asanyarray(depth.get_data())
                 color_image = np.asanyarray(color.get_data())
                 color_image = cv2.cvtColor(color_image,cv2.COLOR_BGR2RGB)
                 #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.07), cv2.COLORMAP_JET)
-                depth_color_frame = rs.colorizer().colorize(depth)
-                depth_colormap = np.asanyarray(depth_color_frame.get_data())
+                if contains_depth:
+                    depth_color_frame = rs.colorizer().colorize(depth)
+                    depth_colormap = np.asanyarray(depth_color_frame.get_data())
                 cv2.imwrite(save_path+'\\'+str(bag_name)+'_'+"color_{}.png".format(i),color_image)
-                cv2.imwrite(save_path+'\\'+str(bag_name)+'_'+"depth_{}.tiff".format(i),depth_image)
-                cv2.imwrite(save_path+'\\'+str(bag_name)+'_'+"colormap_{}.tiff".format(i),depth_colormap)
+                if contains_depth:
+                    cv2.imwrite(save_path+'\\'+str(bag_name)+'_'+"depth_{}.tiff".format(i),depth_image)
+                    cv2.imwrite(save_path+'\\'+str(bag_name)+'_'+"colormap_{}.tiff".format(i),depth_colormap)
                 i+=1
             else:
                 i+=1
@@ -85,7 +89,8 @@ def read_bag(file_name,bag_path,save_path,frame_number,flag=False):
             print (ex)
 
 
-main_folder = r"C:\Users\User\Desktop\second_degree\tomatos_project\data\from other computer\week2"
+main_folder = r"C:\Users\User\Desktop\second_degree\tomatos_project\Progress\New_Data\dorin"
+contains_depth = False
 root = main_folder + r"\bags"  # bags files folder
 save_path = main_folder + r"\images"  # path for saving images
 frame_number = 0  # number of frame which will be saved
@@ -100,7 +105,7 @@ for path, subdirs, files in os.walk(root):
             os.makedirs(save_image_path)
         if len(os.listdir(save_image_path)) == 0:
             try:
-                read_bag(name, join(path, name), save_image_path, frame_number)
+                read_bag(name, join(path, name), save_image_path, frame_number, contains_depth=contains_depth)
             except:
                 print('The bag file: ' + name + ' is corrupted, so ignoring it.')
         else:
