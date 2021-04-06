@@ -4,14 +4,17 @@ import os
 from pathlib import Path
 import gdal
 from tqdm import tqdm
+import pandas as pd
 
 from itertools import product, repeat
 import networkx as nx
 
-main_path = r"C:\Users\User\Desktop\second_degree\tomatos_project\Progress\New_Data\guy"
+main_path = r"C:\Users\User\Desktop\second_degree\tomatos_project\Progress"
 
-original_images_path = fr"{main_path}\images"
-output_cut_images_dir_path = fr"{main_path}\Cut_images"
+original_images_path = fr"{main_path}\Data\All_cut_images"
+
+output_cut_images_dir_path = fr"{main_path}\April_stuff\week3_cropped_with_depth"
+csv_images_names = fr"{main_path}\April_stuff\week3_guy_shani.txt"
 Path(output_cut_images_dir_path).mkdir(parents=True, exist_ok=True)
 
 
@@ -85,14 +88,26 @@ def find_closest_to_camera(rgb_img, depth_img, percentile):
     # find the most central group (x-wise):
     x_start, x_end = find_central_group(depth_x_array)
     group_indices = np.array([[y, x] for y, x in indices if x_start <= x <= x_end])
-    depth_mask_only_group = np.zeros(depth_mask_image.shape)
-    depth_mask_only_group[tuple(group_indices.T)] = 1
+    cropped_rgb_img, cropped_depth_img = crop_by_indices(rgb_img, depth_img, group_indices)
+    # depth_mask_only_group = np.zeros(depth_mask_image.shape)
+    # depth_mask_only_group[tuple(group_indices.T)] = 1
+    #
+    # in_range_indices = np.where(depth_mask_only_group == 1)
+    # min_x = int(np.min(in_range_indices[0]) * 0.9)
+    # max_x = int(np.max(in_range_indices[0]) * 1.1)
+    # min_y = int(np.min(in_range_indices[1]) * 0.9)
+    # max_y = int(np.max(in_range_indices[1]) * 1.1)
+    #
+    # cropped_rgb_img = rgb_img[min_x:max_x, min_y: max_y]
+    # cropped_depth_img = depth_img[min_x:max_x, min_y: max_y]
 
-    in_range_indices = np.where(depth_mask_only_group == 1)
-    min_x = int(np.min(in_range_indices[0]) * 0.9)
-    max_x = int(np.max(in_range_indices[0]) * 1.1)
-    min_y = int(np.min(in_range_indices[1]) * 0.9)
-    max_y = int(np.max(in_range_indices[1]) * 1.1)
+    # depth_mask_image = depth_mask_image * 255
+    # depth_mask_only_group = depth_mask_only_group * 255
+
+    # cv2.imwrite('Depth_10_percentage_selection.png', depth_mask_image)
+    # cv2.imwrite('Depth_selected_group.png', depth_mask_only_group)
+    # cv2.imwrite('RGB_cropped_central_group.png', cropped_rgb_img)
+    # cv2.imwrite('RGB_before_crop.png', rgb_img)
 
     # cv2.imshow("x_array", depth_x_array)
     # cv2.imshow("rgb image", rgb_img)
@@ -120,18 +135,42 @@ def find_closest_to_camera(rgb_img, depth_img, percentile):
     # cv2.imshow("depth_rgb_image", depth_mask_image)
     # cv2.waitKey(0)
 
+    return cropped_rgb_img, cropped_depth_img
+
+
+def crop_by_indices(rgb_img, depth_img, indices):
+    depth_mask = np.zeros(rgb_img.shape[:-1])
+    depth_mask[tuple(indices.T)] = 1
+
+    in_range_indices = np.where(depth_mask == 1)
+    min_x = int(np.min(in_range_indices[0]) * 0.9)
+    max_x = int(np.max(in_range_indices[0]) * 1.1)
+    min_y = int(np.min(in_range_indices[1]) * 0.9)
+    max_y = int(np.max(in_range_indices[1]) * 1.1)
+
     cropped_rgb_img = rgb_img[min_x:max_x, min_y: max_y]
     cropped_depth_img = depth_img[min_x:max_x, min_y: max_y]
     return cropped_rgb_img, cropped_depth_img
 
 
-def find_and_save_cuts(rgb_image_path, depth_image_path, img_name, percentile):
+def crop_plant(rgb_img, depth_img, percentile):
+    percentile_val = np.percentile(depth_img[depth_img != 0], percentile)
+    range_indices = np.logical_not(np.logical_or(depth_img > percentile_val, depth_img == 0))
+    depth_mask_image = np.zeros(rgb_img.shape[:-1])
+    depth_mask_image[range_indices] = 1
+    indices = np.argwhere(depth_mask_image)
+    return crop_by_indices(rgb_img, depth_img, indices)
+
+
+def find_and_save_cuts(rgb_image_path, depth_image_path, img_files_base_path, percentile, cut_whole_image=True):
     rgb_img = cv2.imread(rgb_image_path)
     depth_img = gdal.Open(depth_image_path).ReadAsArray()
 
-    cropped_rgb_img, cropped_depth_img = find_closest_to_camera(rgb_img, depth_img, percentile)
+    if cut_whole_image:
+        cropped_rgb_img, cropped_depth_img = find_closest_to_camera(rgb_img, depth_img, percentile)
+    else:
+        cropped_rgb_img, cropped_depth_img = crop_plant(rgb_img, depth_img, percentile)
 
-    img_files_base_path = fr"{output_cut_images_dir_path}\{img_name}"
     Path(img_files_base_path).mkdir(parents=True, exist_ok=True)
 
     bgr_img_out_path = fr"{img_files_base_path}\bgr_image.png"
@@ -148,12 +187,28 @@ def get_all_files(directory_path):
     return files
 
 
-original_images_names = get_all_files(original_images_path)
+df_filenames = pd.read_csv(csv_images_names, header=None)
+filenames = df_filenames[1]
+images_names = list(filenames.apply(lambda x: x.split('_zssr')[0]))
 
-for img_path in tqdm(original_images_names):
-    filename = os.path.basename(img_path)
-    cut_img_name = filename.split('.')[0]
-    img_name = cut_img_name.split('_color_0')[0] + '_color_0'
-    depth_image_path = img_path.split('_color_0')[0] + '_depth_0.tiff'
+for img_name in tqdm(images_names):
+    original_path = fr'{original_images_path}\{img_name}'
+    output_path = fr'{output_cut_images_dir_path}\{img_name}'
 
-    find_and_save_cuts(img_path, depth_image_path, img_name, percentile=10)
+    rgb_img_path = fr'{original_path}\bgr_image.png'
+    depth_img_path = fr'{original_path}\tiff_depth_image.tiff'
+
+    find_and_save_cuts(rgb_img_path, depth_img_path, output_path, percentile=10, cut_whole_image=False)
+
+
+print('Done!')
+# original_images_names = get_all_files(original_images_path)
+#
+# for img_path in tqdm(original_images_names):
+#     filename = os.path.basename(img_path)
+#     cut_img_name = filename.split('.')[0]
+#     img_name = cut_img_name.split('_color_0')[0] + '_color_0'
+#     depth_image_path = img_path.split('_color_0')[0] + '_depth_0.tiff'
+#     img_files_base_path = fr"{output_cut_images_dir_path}\{img_name}"
+#     fix the function call:
+#     find_and_save_cuts(img_path, depth_image_path, , percentile=10, cut_whole_image=True)
