@@ -4,6 +4,13 @@ import os
 from tqdm import tqdm
 import cv2
 import csv
+import random
+
+
+def random_color():
+    rgbl = [255, 0, 0]
+    random.shuffle(rgbl)
+    return tuple(rgbl)
 
 
 def get_all_files(directory_path):
@@ -40,13 +47,30 @@ def get_data_from_leaf_dict(leaf_dict):
 
 def crop_and_save_leaf(image_data, leaf_dict, image_name, tags, output_cropped_leafs_directory):
     xtl, ytl, xbr, ybr, label = get_data_from_leaf_dict(leaf_dict)
-    cropped_image = image_data[ytl:ybr, xtl:xbr]
-    leaf_image_name = f'{image_name}_leaf_{xtl}_{ytl}_{xbr}_{ybr}.png'
-    if leaf_image_name in tags.keys():
-        raise Exception('Same leaf tagged twice...')
-    tags[leaf_image_name] = label
-    saving_file_path = fr'{output_cropped_leafs_directory}\{leaf_image_name}'
-    cv2.imwrite(saving_file_path, cropped_image)
+
+    img_show = cv2.resize(image_data, (500, 500))
+    cv2.rectangle(image_data, (int(xtl), int(ytl)), (int(xbr), int(ybr)), random_color(), 2)
+    original_image_resized = cv2.resize(image_data, (500, 500))
+    cv2.imshow('original_image', original_image_resized)
+
+    height_diff = image_data.shape[0] / 500
+    width_diff = image_data.shape[1] / 500
+    xtl /= width_diff
+    xbr /= width_diff
+    ytl /= height_diff
+    ybr /= height_diff
+    cv2.rectangle(img_show, (int(xtl), int(ytl)), (int(xbr), int(ybr)), random_color(), 1)
+    cv2.imshow('resized_image', img_show)
+    cv2.waitKey(0)
+
+    #
+    # cropped_image = image_data[ytl:ybr, xtl:xbr]
+    # leaf_image_name = f'{image_name}_leaf_{xtl}_{ytl}_{xbr}_{ybr}.png'
+    # if leaf_image_name in tags.keys():
+    #     raise Exception('Same leaf tagged twice...')
+    # tags[leaf_image_name] = label
+    # saving_file_path = fr'{output_cropped_leafs_directory}\{leaf_image_name}'
+    # cv2.imwrite(saving_file_path, cropped_image)
 
 
 def get_name_for_leafs(name):

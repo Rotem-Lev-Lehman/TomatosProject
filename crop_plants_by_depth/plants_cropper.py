@@ -9,13 +9,15 @@ import pandas as pd
 from itertools import product, repeat
 import networkx as nx
 
-main_path = r"C:\Users\User\Desktop\second_degree\tomatos_project\Progress"
+main_path = r"C:\Users\User\Desktop\second_degree\tomatos_project\Progress\Data"
 
-original_images_path = fr"{main_path}\Data\All_cut_images"
+original_images_path = fr"{main_path}\All_cut_images"
 
-output_cut_images_dir_path = fr"{main_path}\April_stuff\week3_cropped_with_depth"
-csv_images_names = fr"{main_path}\April_stuff\week3_guy_shani.txt"
-Path(output_cut_images_dir_path).mkdir(parents=True, exist_ok=True)
+output_cut_images_dir_path = fr"{main_path}\depth_crops"
+output_blacked_background = fr"{output_cut_images_dir_path}\blacked_background"
+output_non_blacked_background = fr"{output_cut_images_dir_path}\non_blacked_background"
+Path(output_blacked_background).mkdir(parents=True, exist_ok=True)
+Path(output_non_blacked_background).mkdir(parents=True, exist_ok=True)
 
 
 def get_nx_indices_graph(img_shape):
@@ -138,67 +140,109 @@ def find_closest_to_camera(rgb_img, depth_img, percentile):
     return cropped_rgb_img, cropped_depth_img
 
 
-def crop_by_indices(rgb_img, depth_img, indices):
+def crop_by_indices(rgb_img, depth_img, indices, add_margin_10_percent=True, black_background=False):
     depth_mask = np.zeros(rgb_img.shape[:-1])
     depth_mask[tuple(indices.T)] = 1
 
     in_range_indices = np.where(depth_mask == 1)
-    min_x = int(np.min(in_range_indices[0]) * 0.9)
-    max_x = int(np.max(in_range_indices[0]) * 1.1)
-    min_y = int(np.min(in_range_indices[1]) * 0.9)
-    max_y = int(np.max(in_range_indices[1]) * 1.1)
+    min_x = int(np.min(in_range_indices[0]))
+    max_x = int(np.max(in_range_indices[0]))
+    min_y = int(np.min(in_range_indices[1]))
+    max_y = int(np.max(in_range_indices[1]))
+
+    if add_margin_10_percent:
+        min_x = int(min_x * 0.9)
+        max_x = int(max_x * 1.1)
+        min_y = int(min_y * 0.9)
+        max_y = int(max_y * 1.1)
+
+    # cv2.imshow("before black", rgb_img)
+    if black_background:
+        rgb_img[depth_mask == 0] = 0
+    # cv2.imshow("blacked", rgb_img)
 
     cropped_rgb_img = rgb_img[min_x:max_x, min_y: max_y]
+    # cv2.imshow("cropped", cropped_rgb_img)
+    # cv2.waitKey(0)
     cropped_depth_img = depth_img[min_x:max_x, min_y: max_y]
     return cropped_rgb_img, cropped_depth_img
 
 
-def crop_plant(rgb_img, depth_img, percentile):
+def crop_plant(rgb_img, depth_img, percentile, add_margin_10_percent=True, black_background=False):
     percentile_val = np.percentile(depth_img[depth_img != 0], percentile)
     range_indices = np.logical_not(np.logical_or(depth_img > percentile_val, depth_img == 0))
     depth_mask_image = np.zeros(rgb_img.shape[:-1])
     depth_mask_image[range_indices] = 1
     indices = np.argwhere(depth_mask_image)
-    return crop_by_indices(rgb_img, depth_img, indices)
+    return crop_by_indices(rgb_img, depth_img, indices, add_margin_10_percent=add_margin_10_percent, black_background=black_background)
 
 
-def find_and_save_cuts(rgb_image_path, depth_image_path, img_files_base_path, percentile, cut_whole_image=True):
+def find_and_save_cuts(rgb_image_path, depth_image_path, img_files_base_path, percentile, cut_whole_image=True, add_margin_10_percent=True, black_background=False):
     rgb_img = cv2.imread(rgb_image_path)
     depth_img = gdal.Open(depth_image_path).ReadAsArray()
 
-    if cut_whole_image:
-        cropped_rgb_img, cropped_depth_img = find_closest_to_camera(rgb_img, depth_img, percentile)
-    else:
-        cropped_rgb_img, cropped_depth_img = crop_plant(rgb_img, depth_img, percentile)
+    try:
+        if cut_whole_image:
+            cropped_rgb_img, cropped_depth_img = find_closest_to_camera(rgb_img, depth_img, percentile)
+        else:
+            cropped_rgb_img, cropped_depth_img = crop_plant(rgb_img, depth_img, percentile, add_margin_10_percent=add_margin_10_percent, black_background=black_background)
 
-    Path(img_files_base_path).mkdir(parents=True, exist_ok=True)
+        Path(img_files_base_path).mkdir(parents=True, exist_ok=True)
 
-    bgr_img_out_path = fr"{img_files_base_path}\bgr_image.png"
-    depth_img_out_path = fr"{img_files_base_path}\depth_image.png"
-    depth_tiff_out_path = fr"{img_files_base_path}\tiff_depth_image.tiff"
+        bgr_img_out_path = fr"{img_files_base_path}\bgr_image.png"
+        depth_img_out_path = fr"{img_files_base_path}\depth_image.png"
+        depth_tiff_out_path = fr"{img_files_base_path}\tiff_depth_image.tiff"
 
-    cv2.imwrite(bgr_img_out_path, cropped_rgb_img)
-    cv2.imwrite(depth_img_out_path, cropped_depth_img)
-    cv2.imwrite(depth_tiff_out_path, cropped_depth_img)
+        cv2.imwrite(bgr_img_out_path, cropped_rgb_img)
+        cv2.imwrite(depth_img_out_path, cropped_depth_img)
+        cv2.imwrite(depth_tiff_out_path, cropped_depth_img)
+    except:
+        print(f'The image {img_files_base_path} had an exception')
 
 
 def get_all_files(directory_path):
-    files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(directory_path) for f in filenames if os.path.splitext(f)[1] in ['.png', '.jpeg']]
+    files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(directory_path) for f in filenames if f == 'bgr_image.png']
     return files
 
 
-df_filenames = pd.read_csv(csv_images_names, header=None)
-filenames = df_filenames[1]
-images_names = list(filenames.apply(lambda x: x.split('_zssr')[0]))
+def get_all_subdirectories(directory_path):
+    return next(os.walk(directory_path))[1]
 
-for img_name in tqdm(images_names):
+
+# df_filenames = pd.read_csv(csv_images_names, header=None)
+# filenames = df_filenames[1]
+# images_names = list(filenames.apply(lambda x: x.split('_zssr')[0]))
+directories = get_all_subdirectories(original_images_path)
+
+background_options = [True, False]  # Black background = True
+run_options = {  # (percentile, margin)
+    'black_background': [(20, True), (20, False), (10, True)],
+    'non_black_background': [(10, False), (5, True)]
+}
+
+for img_name in tqdm(directories):
     original_path = fr'{original_images_path}\{img_name}'
-    output_path = fr'{output_cut_images_dir_path}\{img_name}'
 
     rgb_img_path = fr'{original_path}\bgr_image.png'
     depth_img_path = fr'{original_path}\tiff_depth_image.tiff'
 
-    find_and_save_cuts(rgb_img_path, depth_img_path, output_path, percentile=10, cut_whole_image=False)
+    for black_background in background_options:
+        if black_background:
+            background_output_path = output_blacked_background
+            options = run_options['black_background']
+        else:
+            background_output_path = output_non_blacked_background
+            options = run_options['non_black_background']
+        for percentile, margin in options:
+            margin_text = 'without_margin'
+            if margin:
+                margin_text = 'with_margin'
+            output_path = fr'{background_output_path}\percentile_{percentile}_{margin_text}'
+            Path(output_path).mkdir(parents=True, exist_ok=True)
+            output_path = fr'{output_path}\{img_name}'
+
+            find_and_save_cuts(rgb_img_path, depth_img_path, output_path, percentile=percentile, cut_whole_image=False,
+                               add_margin_10_percent=margin, black_background=black_background)
 
 
 print('Done!')
